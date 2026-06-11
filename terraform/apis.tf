@@ -1,19 +1,11 @@
 resource "google_project_service" "apis" {
   for_each = toset([
-    "run.googleapis.com",
-    "firestore.googleapis.com",
-    "secretmanager.googleapis.com",
-    "aiplatform.googleapis.com",
-    "gmail.googleapis.com",
-    "artifactregistry.googleapis.com",
-    "cloudbuild.googleapis.com",
-    "cloudscheduler.googleapis.com",
-    "pubsub.googleapis.com",
-    "billingbudgets.googleapis.com",
-    "cloudfunctions.googleapis.com",
-    "cloudtasks.googleapis.com",
-    "compute.googleapis.com",
+    "aiplatform.googleapis.com",      # Gemini 1.5 Flash
+    "firestore.googleapis.com",       # Knowledge Graph storage
+    "secretmanager.googleapis.com",   # Gmail token vault
+    "gmail.googleapis.com"            # Inbox access
   ])
+
   service            = each.key
   disable_on_destroy = false
 }

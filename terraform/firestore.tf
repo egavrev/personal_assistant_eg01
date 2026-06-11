@@ -1,35 +1,26 @@
+# 1. The Knowledge Graph Database
 resource "google_firestore_database" "default" {
   project     = var.project_id
-  name        = "personal_assistent_eg01"
+  
+  # "(default)" is a required naming convention for your primary DB in GCP
+  name        = "(default)" 
   location_id = var.region
+  
+  # This sets it as a NoSQL document database, perfect for our arrays
   type        = "FIRESTORE_NATIVE"
-  depends_on  = [google_project_service.apis]
+
+  depends_on = [google_project_service.apis]
 }
 
-resource "google_firestore_index" "corrections_by_sender" {
-  project    = var.project_id
-  database   = google_firestore_database.default.name
-  collection = "correction_log"
-  fields {
-    field_path = "sender_id"
-    order      = "ASCENDING"
+# 2. The Empty Secret Container for the Gmail Token
+resource "google_secret_manager_secret" "gmail_refresh_token" {
+  secret_id = "gmail-refresh-token"
+  project   = var.project_id
+  
+  # Tells GCP to automatically replicate this secret for high availability
+  replication {
+    auto {}
   }
-  fields {
-    field_path = "corrected_at"
-    order      = "DESCENDING"
-  }
-}
 
-resource "google_firestore_index" "emails_by_week_status" {
-  project    = var.project_id
-  database   = google_firestore_database.default.name
-  collection = "emails"
-  fields {
-    field_path = "week_key"
-    order      = "ASCENDING"
-  }
-  fields {
-    field_path = "status"
-    order      = "ASCENDING"
-  }
+  depends_on = [google_project_service.apis]
 }
