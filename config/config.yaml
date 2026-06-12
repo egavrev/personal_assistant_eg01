@@ -1,0 +1,24 @@
+# config/config.yaml
+
+system:
+  # SAFE MODE: If false, the agent will ONLY apply labels in Gmail.
+  # If true, it will actually archive and move mail to the trash.
+  enable_mutations: false  
+
+ingestion:
+  # How many days of email to fetch in a single run
+  days_per_batch: 7
+  # The maximum number of emails to process before pausing for review
+  batch_size: 50
+
+preferences:
+  # The foundational taxonomy. The AI will use these to start, 
+  # but is allowed to suggest new ones dynamically.
+  seed_interests:
+    - "IT Delivery & Agile Management"
+    - "AI Development & LLMs"
+    - "Cloud Native Architecture"
+    - "Terraform & IaC"
+    - "LLMs and big laboratories"
+    - "AI Agents"
+    - "AI Agents"
