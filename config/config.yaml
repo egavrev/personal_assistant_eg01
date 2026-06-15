@@ -3,16 +3,19 @@
 system:
   # SAFE MODE: If false, the agent will ONLY apply labels in Gmail.
   # If true, it will actually archive and move mail to the trash.
-  enable_mutations: false  
+  enable_mutations: false
 
 ingestion:
   # How many days of email to fetch in a single run
-  days_per_batch: 7
+  days_per_batch: 30
+  # Hard cap on emails fetched per run (safety valve for noisy weeks)
+  max_fetch_per_run: 500
   # The maximum number of emails to process before pausing for review
+  # (currently unused — becomes the review-queue pacing knob in Sprint 5)
   batch_size: 50
 
 preferences:
-  # The foundational taxonomy. The AI will use these to start, 
+  # The foundational taxonomy. The AI will use these to start,
   # but is allowed to suggest new ones dynamically.
   seed_interests:
     - "IT Delivery & Agile Management"
@@ -20,5 +23,46 @@ preferences:
     - "Cloud Native Architecture"
     - "Terraform & IaC"
     - "LLMs and big laboratories"
-    - "AI Agents"
-    - "AI Agents"
+    - "AI Agents"          # note: this was listed twice in your file — keep it once
+
+entities:
+  # Decision A: domain is identity. Decision C: exception lists override.
+  # Senders from these domains are PEOPLE (identity = full email address)
+  freemail_domains:
+    - gmail.com
+    - yahoo.com
+    - outlook.com
+    - hotmail.com
+    - proton.me
+  # Always SYSTEM, regardless of anything else
+  system_domains:
+    - github.com
+    - atlassian.net
+    - google.com        # calendar-notification@, drive-shares-noreply@ ...
+    - docusign.net
+  # Explicit person exceptions (work colleagues on corporate domains, etc.)
+  person_emails:
+    - someone@orange.com   # replace with real examples as you meet them
+
+triage_filter:
+  # Phase-1 free firewall. Substring match on the sender; an email whose
+  # sender contains ANY of these is dropped as automated junk.
+  junk_senders:
+    - "no-reply"
+    - "noreply"
+    - "notifications@"
+    - "do-not-reply"
+    - "marketing"
+    - "promotions"
+    - "newsletter@"
+    - "info@"             # WATCH: catches real humans at small firms — see Task 3.3
+  # Regex patterns matched against the subject (case-insensitive).
+  # Keep these as valid Python regex — they are compiled, not substring-matched.
+  junk_subjects:
+    - "out of office"
+    - "jira\\]"          # note: \\ in YAML so the regex sees a literal \]
+    - "reset your password"
+    - "verify your email"
+    - "security alert"
+    - "meeting canceled"
+    - "your receipt"

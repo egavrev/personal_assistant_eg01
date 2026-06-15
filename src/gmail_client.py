@@ -1,4 +1,6 @@
 from googleapiclient.discovery import build
+from datetime import datetime, timezone
+
 
 class GmailClient:
     def __init__(self, credentials):
@@ -26,12 +28,16 @@ class GmailClient:
             headers = msg_data['payload']['headers']
             subject = next((h['value'] for h in headers if h['name'] == 'Subject'), "No Subject")
             sender = next((h['value'] for h in headers if h['name'] == 'From'), "Unknown Sender")
+            internal_ms = int(msg_data.get('internalDate', 0))
+            received_at = datetime.fromtimestamp(internal_ms / 1000, tz=timezone.utc)
             
             parsed_emails.append({
                 "id": msg['id'],
                 "subject": subject,
                 "sender": sender,
-                "snippet": msg_data.get('snippet', '')
+                "snippet": msg_data.get('snippet', ''),
+                "received_at": received_at,
             })
+
             
         return parsed_emails
