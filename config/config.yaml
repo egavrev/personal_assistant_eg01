@@ -66,3 +66,27 @@ triage_filter:
     - "security alert"
     - "meeting canceled"
     - "your receipt"
+classifier:
+  #location of file for prmmpt template
+  classifier_prompt_template: "prompts/classify.md"
+  # Model string confirmed in Session 0. One line to change when a model retires.
+  model: "gemini-2.5-flash"        # or "gemini-3-flash" if Session 0 showed it works
+  location: "global"
+  # Judge gate: at or above this confidence -> auto-classified; below -> needs_review.
+  # Start HIGH so you catch mistakes while correction history is thin. Relax later.
+  confidence_threshold: 0.75
+  # How many past corrections to inject into the prompt (Session 4 uses this).
+  max_corrections_in_prompt: 15
+  # Body excerpt length sent to the model.
+  body_excerpt_chars: 1500
+  # Categories the model must choose from. Seeded from your interests + operational buckets.
+  categories:
+    - "Delivery Escalation"        # critical work, needs attention
+    - "Work - Routine"             # normal work traffic
+    - "AI & LLMs"
+    - "Cloud & Architecture"
+    - "Learning Resource"          # courses, tutorials, Roblox dev, etc.
+    - "Newsletter"
+    - "Personal"
+    - "Admin & Transactional"      # receipts, confirmations that survived the firewall
+    - "Other"

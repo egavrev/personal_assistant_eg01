@@ -8,6 +8,10 @@ from src.gmail_client import GmailClient
 from src.triage_filter import TriageFilter
 from src.signal_store import SignalStore
 
+from src.classifier import Classifier
+from src.judge import judge_route
+from src.corrections import build_corrections_context
+
 
 def week_label(date_str: str) -> str:
     """'2025-01-01' -> '2025-W01' (ISO week of the window start)."""

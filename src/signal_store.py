@@ -116,3 +116,19 @@ class SignalStore:
             **stats,
             "started_at": firestore.SERVER_TIMESTAMP,
         })
+    def get_pending(self, limit: int = 50):
+        """Survivors waiting for the brain."""
+        q = (self.db.collection("signals")
+             .where("status", "==", "pending_classification")
+             .limit(limit))
+        return [(d.id, d.to_dict()) for d in q.stream()]
+
+    def save_classification(self, message_id: str, classification: dict, new_status: str):
+        tokens = classification.pop("_tokens", 0)
+        self.db.collection("signals").document(message_id).set(
+            {"classification": classification, "status": new_status,
+             "updated_at": firestore.SERVER_TIMESTAMP},
+            merge=True,
+        )
+        return tokens
+

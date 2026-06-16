@@ -1,10 +1,49 @@
+import base64
 from googleapiclient.discovery import build
 from datetime import datetime, timezone
+
 
 
 class GmailClient:
     def __init__(self, credentials):
         self.service = build('gmail', 'v1', credentials=credentials)
+
+    def get_body_excerpt(self, message_id: str, max_chars: int = 1500) -> str:
+        """Fetch and flatten an email body to plain text, truncated. Survivors only."""
+        msg = self.service.users().messages().get(
+            userId='me', id=message_id, format='full'
+        ).execute()
+        text = self._extract_text(msg.get('payload', {}))
+        text = ' '.join(text.split())          # collapse whitespace/newlines
+        return text[:max_chars]
+
+    def _extract_text(self, payload) -> str:
+        """Walk the MIME tree, prefer text/plain, fall back to stripped text/html."""
+        mime = payload.get('mimeType', '')
+        body = payload.get('body', {})
+        data = body.get('data')
+
+        if mime == 'text/plain' and data:
+            return self._decode(data)
+        if mime == 'text/html' and data:
+            return self._strip_html(self._decode(data))
+
+        # multipart: recurse, prefer the first text/plain we find
+        parts = payload.get('parts', [])
+        plain = [self._extract_text(p) for p in parts if p.get('mimeType') == 'text/plain']
+        if any(plain):
+            return ' '.join(t for t in plain if t)
+        return ' '.join(self._extract_text(p) for p in parts)  # fall back to everything
+
+    @staticmethod
+    def _decode(data: str) -> str:
+        return base64.urlsafe_b64decode(data).decode('utf-8', errors='replace')
+
+    @staticmethod
+    def _strip_html(html: str) -> str:
+        import re
+        html = re.sub(r'<(script|style)[^>]*>.*?</\1>', ' ', html, flags=re.DOTALL | re.IGNORECASE)
+        return re.sub(r'<[^>]+>', ' ', html)
 
     def fetch_batch_by_date(self, start_date, end_date, limit=50):
         """Fetches emails strictly within a specific time window."""
