@@ -1,6 +1,9 @@
 import json
 from google import genai
 from google.genai import types
+import logging, time
+
+logger = logging.getLogger("classifier")
 
 
 class Classifier:
@@ -14,6 +17,7 @@ class Classifier:
 
     def classify(self, signal: dict, body_excerpt: str, corrections_context: str = "") -> dict:
         """Returns the classification dict, or a low-confidence fallback on parse failure."""
+        t0 = time.time()
         prompt = self._build_prompt(signal, body_excerpt, corrections_context)
         try:
             resp = self.client.models.generate_content(
@@ -24,10 +28,17 @@ class Classifier:
                     response_mime_type="application/json",
                 ),
             )
+            dt = time.time() - t0
+            um = getattr(resp, "usage_metadata", None)
+            logger.info("gemini ok model=%s tokens=%s latency=%.2fs subject=%r",
+                self.model, um.total_token_count if um else "?", dt,
+                signal.get("subject","")[:40])
             data = json.loads(resp.text)
             return self._validate(data, resp)
         except (json.JSONDecodeError, ValueError) as e:
             # Never crash a batch on one bad response — route it to human review.
+            logger.warning("gemini FAIL model=%s err=%s subject=%r",
+                   self.model, str(e)[:120], signal.get("subject","")[:40])
             return {
                 "category": "Other", "topics": [], "sender_type": "system",
                 "needs_reply": False, "confidence": 0.0,

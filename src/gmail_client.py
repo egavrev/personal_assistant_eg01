@@ -44,7 +44,25 @@ class GmailClient:
         import re
         html = re.sub(r'<(script|style)[^>]*>.*?</\1>', ' ', html, flags=re.DOTALL | re.IGNORECASE)
         return re.sub(r'<[^>]+>', ' ', html)
+    #tool is not deliting any mail it is only labeling it with propper label
+    def apply_label(self, message_id: str, label_name: str):
+        """Create the label if missing, then add it to the message. Add-only."""
+        label_id = self._ensure_label(label_name)
+        self.service.users().messages().modify(
+            userId='me', id=message_id, body={'addLabelIds': [label_id]}
+        ).execute()
 
+    def _ensure_label(self, label_name: str) -> str:
+        existing = self.service.users().labels().list(userId='me').execute().get('labels', [])
+        for lab in existing:
+            if lab['name'] == label_name:
+                return lab['id']
+        created = self.service.users().labels().create(
+            userId='me', body={'name': label_name,
+                                'labelListVisibility': 'labelShow',
+                                'messageListVisibility': 'show'}
+        ).execute()
+        return created['id']
     def fetch_batch_by_date(self, start_date, end_date, limit=50):
         """Fetches emails strictly within a specific time window."""
         
