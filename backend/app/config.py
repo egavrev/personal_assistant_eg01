@@ -49,6 +49,17 @@ class Settings(BaseModel):
         """Session cookie ``Secure`` flag: off in dev so localhost works, on otherwise."""
         return not self.is_dev
 
+    def is_allowed(self, email: str | None) -> bool:
+        """Allowlist check: the email must match the single owner account.
+
+        Compared case-insensitively and trimmed so trivial formatting
+        differences don't lock out the owner. Used by both the OAuth callback
+        and ``require_user()`` so they enforce the same rule.
+        """
+        if not email:
+            return False
+        return email.strip().lower() == self.allowed_user_email.strip().lower()
+
 
 def _load_settings() -> Settings:
     """Read + validate settings from the environment, failing loudly if incomplete."""
