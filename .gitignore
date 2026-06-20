@@ -1,5 +1,6 @@
 # Environment / secrets
 .env
+.gitignore
 *.env
 !.env.example
 
@@ -15,3 +16,28 @@ venv/
 
 # OS / editor
 .DS_Store
+# ===== Terraform =====
+# Downloaded providers & modules (this is where the provider LICENSE.txt files live)
+**/.terraform/*
+.terraform/
+.terraform.lock.hcl
+
+# State files — NEVER commit these (they contain secrets in plaintext)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+crash.log
+crash.*.log
+
+# Variable files — your real values, often secrets (project IDs, billing account, emails)
+*.tfvars
+*.tfvars.json
+!example.tfvars          # keep a committed template if you make one
+!*.tfvars.example
+
+# Plan output & overrides
+*.tfplan
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
