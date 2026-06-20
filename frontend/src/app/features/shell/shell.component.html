@@ -1,0 +1,53 @@
+<div class="flex min-h-screen bg-slate-50">
+  <aside class="flex w-60 shrink-0 flex-col border-r border-slate-800 bg-slate-900 text-slate-300">
+    <!-- Brand -->
+    <div class="flex h-14 items-center gap-2 border-b border-slate-800 px-5">
+      <span class="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-600 text-xs font-bold text-white">
+        PA
+      </span>
+      <span class="text-sm font-semibold tracking-tight text-white">Personal Assistant</span>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="flex-1 space-y-1 px-3 py-4">
+      @for (item of navItems; track item.route) {
+        <a
+          [routerLink]="item.route"
+          routerLinkActive="bg-slate-800 text-white"
+          [routerLinkActiveOptions]="{ exact: item.route === '/' }"
+          class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
+        >
+          @if (item.icon) {
+            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path [attr.d]="item.icon" />
+            </svg>
+          }
+          <span>{{ item.label }}</span>
+        </a>
+      }
+    </nav>
+
+    <!-- Signed-in user + logout -->
+    <div class="border-t border-slate-800 p-3">
+      <p class="truncate px-2 pb-2 text-xs text-slate-400" [title]="currentUser()?.email ?? ''">
+        {{ currentUser()?.email }}
+      </p>
+      <button
+        type="button"
+        (click)="logout()"
+        class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-800 hover:text-white"
+      >
+        <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path
+            d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"
+          />
+        </svg>
+        <span>Sign out</span>
+      </button>
+    </div>
+  </aside>
+
+  <main class="flex-1 overflow-y-auto">
+    <router-outlet />
+  </main>
+</div>
