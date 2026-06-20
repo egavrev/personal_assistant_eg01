@@ -32,8 +32,11 @@ oauth.register(
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-# Where to send the browser once login succeeds (the future Angular SPA root).
-_POST_LOGIN_REDIRECT = "/"
+# Where to send the browser once login succeeds. Google redirects back to the
+# backend origin (the callback), not the SPA, so in dev this points at the
+# Angular dev server via POST_LOGIN_REDIRECT (e.g. http://localhost:4200/).
+# Defaults to "/" for same-origin / production deployments.
+_POST_LOGIN_REDIRECT = os.environ.get("POST_LOGIN_REDIRECT", "/")
 
 
 @router.get("/login")
@@ -55,7 +58,7 @@ async def callback(request: Request):
         if email != os.environ["ALLOWED_USER_EMAIL"]:
             raise HTTPException(status_code=403, detail="Access restricted to the account owner.")
         request.session["user_email"] = email
-        return RedirectResponse(url="/")
+        return RedirectResponse(url=_POST_LOGIN_REDIRECT)
     except HTTPException:
         raise
     except Exception as e:
