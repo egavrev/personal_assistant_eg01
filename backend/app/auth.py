@@ -41,7 +41,6 @@ _POST_LOGIN_REDIRECT = os.environ.get("POST_LOGIN_REDIRECT", "/")
 
 @router.get("/login")
 async def login(request: Request):
-    print(">>> redirect ",os.environ["OAUTH_REDIRECT_URI"])
     return await oauth.google.authorize_redirect(
         request,
         os.environ["OAUTH_REDIRECT_URI"],
@@ -53,8 +52,6 @@ async def callback(request: Request):
         token = await oauth.google.authorize_access_token(request)   # no redirect_uri arg
         user = token.get("userinfo")
         email = user["email"]
-        print(">>> email  ", email)
-        print(">> allowed emails",os.environ["ALLOWED_USER_EMAIL"])
         if email != os.environ["ALLOWED_USER_EMAIL"]:
             raise HTTPException(status_code=403, detail="Access restricted to the account owner.")
         request.session["user_email"] = email
@@ -67,7 +64,6 @@ async def callback(request: Request):
 
 @router.get("/me")
 def me(request: Request):
-    print(">>> session contents:", dict(request.session))
     email = request.session.get("user_email")
     if not email:
         raise HTTPException(status_code=401, detail="Not authenticated")
