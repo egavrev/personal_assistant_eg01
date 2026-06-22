@@ -1,6 +1,5 @@
 # Environment / secrets
 .env
-.gitignore
 *.env
 !.env.example
 
