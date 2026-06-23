@@ -59,6 +59,7 @@ class StatsSummary(BaseModel):
     backlog_pending: int       # pending_classification — waiting for the brain
     needs_review_count: int    # waiting for the human to review
     corrections_total: int     # number of correction_log documents
+    est_cost_total: float      # cumulative est_cost_usd across all runs
     categories: list[CategoryCount]
     last_run: LastRun | None
 
@@ -85,6 +86,7 @@ def summary(
         backlog_pending=counts.get("pending_classification", 0),
         needs_review_count=counts.get("needs_review", 0),
         corrections_total=store.corrections_count(),
+        est_cost_total=store.total_est_cost(),
         categories=[
             CategoryCount(name=name, count=count)
             for name, count in store.category_counts(top=10)

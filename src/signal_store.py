@@ -245,6 +245,16 @@ class SignalStore:
                      .limit(1).stream())
         return snaps[0].to_dict() if snaps else None
 
+    def total_est_cost(self) -> float:
+        """Cumulative pipeline spend: sum of ``est_cost_usd`` across all runs.
+
+        Projects only the cost field with ``select()``; the runs collection is
+        small (≈one doc per processed week)."""
+        total = 0.0
+        for d in self.db.collection("runs").select(["est_cost_usd"]).stream():
+            total += float((d.to_dict() or {}).get("est_cost_usd", 0) or 0)
+        return round(total, 4)
+
     # ---------- correction_log (the most valuable data in the system) ----------
     @staticmethod
     def _correction_doc(signal_ref: str, field: str, ai_value, your_value,
