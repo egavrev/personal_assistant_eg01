@@ -17,6 +17,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import router as auth_router
 from app.config import settings
+from app.routers.stats import router as stats_router
 
 app = FastAPI(title="Email Triage Dashboard API")
 
@@ -41,3 +42,4 @@ if settings.is_dev:
     )
 
 app.include_router(auth_router)
+app.include_router(stats_router)

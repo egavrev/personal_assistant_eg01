@@ -4,3 +4,6 @@ authlib==1.4.0
 itsdangerous==2.2.0
 httpx==0.28.1
 python-dotenv==1.0.1
+# Stats endpoints reuse the pipeline's Firestore layer (src/signal_store.py).
+google-cloud-firestore==2.27.0
+PyYAML==6.0.3
