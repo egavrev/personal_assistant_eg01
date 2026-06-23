@@ -30,6 +30,7 @@ def main():
     creds = flow.run_local_server(
         host='localhost',
         port=8080,
+        access_type='offline', prompt='consent',
         authorization_prompt_message='Please copy and visit this URL in your browser: \n\n{url}\n',
         success_message='Authorization successful! You can close this browser tab.',
         open_browser=False
@@ -53,11 +54,12 @@ def main():
     
     try:
         # input=refresh_token pipes the secret directly into standard input
+        # text=True handles the str→bytes encoding, so pass the str (not pre-encoded bytes)
         process = subprocess.run(
-            command, 
-            input=refresh_token.encode('utf-8'), 
-            check=True, 
-            capture_output=True, 
+            command,
+            input=refresh_token,
+            check=True,
+            capture_output=True,
             text=True
         )
         print(f"[✓] Success! Token locked securely in Secret Manager.")
