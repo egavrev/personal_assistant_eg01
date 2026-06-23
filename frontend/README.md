@@ -1,10 +1,10 @@
 # Personal Assistant — frontend
 
-Angular 22 (standalone, no NgModules) dashboard shell for the personal
-email-triage assistant. This task is the **navigable shell only**: a login
-screen, an auth guard, and an app layout (sidebar + one empty Dashboard page).
-No stats, pipeline controls, or review queue yet — those land in a later
-session.
+Angular 22 (standalone, no NgModules) dashboard for the personal email-triage
+assistant: a login screen, an auth guard, an app layout (sidebar + content),
+and a **Dashboard page** showing real mail-processing status from Firestore —
+stat cards, the last pipeline run, and two charts. Pipeline controls and the
+review queue are still to come in later sessions.
 
 Authentication is handled entirely by the FastAPI backend (Google OAuth2 +
 an HttpOnly session cookie). The frontend never implements OAuth and never
@@ -16,6 +16,8 @@ stores tokens; it only asks the backend "who am I?" and reacts.
 - Tailwind CSS v3 (utility classes only, no component library).
 - Angular Router with a functional auth guard.
 - `provideHttpClient(withFetch)` + a credentials interceptor.
+- **Charts are hand-rolled SVG/CSS** (`features/dashboard/charts/`) — no chart
+  library, so there is no extra dependency to install. `npm install` is enough.
 
 ## Prerequisites
 
@@ -92,13 +94,13 @@ Compiles to `dist/frontend` with no errors and no `any` types (strict mode).
 
 The shell is built so a new module is **two lines**:
 
-1. One entry in `navItems` in
-   [`shell.component.ts`](src/app/features/shell/shell.component.ts) —
-   `{ label, route, icon? }`.
+1. One entry in `NAV_ITEMS` in
+   [`core/nav.ts`](src/app/core/nav.ts) — `{ label, route, icon? }`. The
+   ShellComponent renders this array in a loop.
 2. One child route under the shell in
    [`app.routes.ts`](src/app/app.routes.ts).
 
-Both files have a marked `ADD FUTURE …` comment showing exactly where.
+Both files have a marked `… GO HERE` / `ADD FUTURE …` comment showing exactly where.
 
 ## Project structure
 
@@ -111,10 +113,13 @@ src/app/
     auth.service.ts        # signals + loadMe/login/logout
     auth.guard.ts          # CanActivateFn -> /login when unauthenticated
     credentials.interceptor.ts  # withCredentials on every request
+    nav.ts                 # NAV_ITEMS — the sidebar menu seam
   features/
     login/                 # public login screen
-    shell/                 # sidebar layout + nav seam
-    dashboard/             # empty placeholder page
+    shell/                 # sidebar layout (renders NAV_ITEMS)
+    dashboard/             # status page
+      dashboard.service.ts # fetches /api/stats summary + weekly -> signals
+      charts/              # weekly-trend (SVG) + category-breakdown (CSS) charts
 ```
 
 ## Notes
