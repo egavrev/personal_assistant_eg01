@@ -19,7 +19,12 @@ from app.auth import router as auth_router
 from app.config import settings
 from app.routers.stats import router as stats_router
 
-app = FastAPI(title="Email Triage Dashboard API")
+# Docs live under /api so they're reachable through the frontend's /api proxy.
+app = FastAPI(
+    title="Email Triage Dashboard API",
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json",
+)
 
 # Session cookie. Starlette's SessionMiddleware always sets HttpOnly; we pin
 # SameSite=Lax and only enable Secure outside dev so localhost (http) works.
