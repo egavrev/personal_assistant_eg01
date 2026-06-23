@@ -1,5 +1,6 @@
 import os
 import re
+from collections import Counter
 from datetime import datetime, timezone
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
@@ -176,6 +177,73 @@ class SignalStore:
                    .get())
             counts[status] = int(agg[0][0].value)
         return counts
+
+    def corrections_count(self) -> int:
+        """Total number of correction_log documents, via count() aggregation
+        (server-side; does not read the documents)."""
+        agg = self.db.collection("correction_log").count().get()
+        return int(agg[0][0].value)
+
+    def category_counts(self, top: int = 10) -> list[tuple[str, int]]:
+        """Top ``top`` categories by signal count among classified/corrected
+        signals, as ``[(name, count), ...]`` ordered descending.
+
+        Firestore has no GROUP BY and the category set is open-ended (the
+        classifier may coin new categories), so a per-value count() is not an
+        option. Instead we project *only* ``classification.category`` with
+        ``select()`` — each read returns one field, not the whole signal — and
+        tally in memory. Reads are bounded by the number of classified/corrected
+        signals (a subset of the corpus), not the full ~9k collection.
+        """
+        counter: Counter[str] = Counter()
+        for status in ("classified", "corrected"):
+            q = (self.db.collection("signals")
+                 .where(filter=FieldFilter("status", "==", status))
+                 .select(["classification.category"]))
+            for d in q.stream():
+                cat = ((d.to_dict() or {}).get("classification") or {}).get("category")
+                if cat:
+                    counter[cat] += 1
+        return counter.most_common(top)
+
+    # ---------- runs ----------
+    def weekly_runs(self) -> list[dict]:
+        """Per-week pipeline series from the ``runs`` collection, ascending by
+        week, for the dashboard trend chart.
+
+        The collection is small (≈one doc per processed week), so a full stream
+        is cheap. If a week has more than one run doc (a re-run), the most recent
+        (by ``started_at``) wins so a week is never double-counted. ISO week
+        labels ("YYYY-Www") sort lexicographically in chronological order.
+        """
+        latest: dict[str, tuple[datetime, dict]] = {}
+        for d in self.db.collection("runs").stream():
+            doc = d.to_dict() or {}
+            week = doc.get("week")
+            if not week:
+                continue
+            ts = doc.get("started_at") or _EPOCH
+            if week not in latest or ts > latest[week][0]:
+                latest[week] = (ts, doc)
+        out: list[dict] = []
+        for week in sorted(latest):
+            doc = latest[week][1]
+            out.append({
+                "week": week,
+                "fetched": int(doc.get("fetched", 0) or 0),
+                "junk_filtered": int(doc.get("junk_filtered", 0) or 0),
+                "classified": int(doc.get("classified", 0) or 0),
+                "needs_review": int(doc.get("needs_review", 0) or 0),
+            })
+        return out
+
+    def last_run(self) -> dict | None:
+        """Most recent ``runs`` document by ``started_at``, or None if no runs
+        have been recorded yet."""
+        snaps = list(self.db.collection("runs")
+                     .order_by("started_at", direction=firestore.Query.DESCENDING)
+                     .limit(1).stream())
+        return snaps[0].to_dict() if snaps else None
 
     # ---------- correction_log (the most valuable data in the system) ----------
     @staticmethod
