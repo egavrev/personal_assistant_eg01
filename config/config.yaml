@@ -7,7 +7,7 @@ system:
 
 ingestion:
   # How many days of email to fetch in a single run
-  days_per_batch: 30
+  days_per_batch: 7
   # Hard cap on emails fetched per run (safety valve for noisy weeks)
   max_fetch_per_run: 500
   # The maximum number of emails to process before pausing for review
