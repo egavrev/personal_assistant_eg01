@@ -19,7 +19,7 @@ def require_user(request: Request) -> str:
     * Session email not allowed  -> 403 (authenticated, but not the owner)
     * Otherwise                  -> the verified email string
     """
-    email = request.session.get("email")
+    email = request.session.get("user_email")
     if not email:
         raise HTTPException(status_code=401, detail="Not authenticated.")
     if not settings.is_allowed(email):

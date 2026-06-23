@@ -1,12 +1,14 @@
-# Dashboard backend — auth backbone
+# Dashboard backend
 
-FastAPI backend providing Google OAuth2 login, a session cookie, and a
-single-owner email allowlist for the personal email-triage dashboard.
+FastAPI backend providing Google OAuth2 login, a session cookie, a single-owner
+email allowlist, and **read-only mail-processing stats** for the personal
+email-triage dashboard.
 
-This task is **auth only** — there are no dashboard pages, pipeline endpoints,
-or stats here. The one protected endpoint, `GET /api/me`, exists to prove the
-auth flow works end to end. The backend is additive and does not touch the
-existing pipeline (`run_ingestion.py`, `src/*`).
+The backend is additive and does not modify the pipeline (`run_ingestion.py`).
+The stats endpoints **reuse** the pipeline's Firestore layer
+(`src/signal_store.py`) rather than issuing their own queries — counts use
+Firestore `count()` aggregations, so the full signal collection is never
+streamed into memory.
 
 ## Endpoints
 
@@ -15,10 +17,13 @@ existing pipeline (`run_ingestion.py`, `src/*`).
 | GET    | `/api/auth/login`    | public      | Redirect to Google's consent screen (`openid email profile`) |
 | GET    | `/api/auth/callback` | public      | Exchange code, enforce allowlist, set session, redirect to `/` |
 | GET    | `/api/auth/logout`   | public      | Clear the session, return `200`                              |
-| GET    | `/api/me`            | owner only  | Return `{"email": ...}` for the logged-in owner              |
+| GET    | `/api/auth/me`       | owner only  | Return `{"email": ...}` for the logged-in owner              |
+| GET    | `/api/stats/summary` | owner only  | Headline counts, top categories, cumulative cost, last run   |
+| GET    | `/api/stats/weekly`  | owner only  | Per-week pipeline series (fetched/junk/classified/needs_review) |
 
 `require_user()` (in `app/deps.py`) is the single gate for protected routes:
 no session → `401`; session present but not the allowlisted owner → `403`.
+Interactive API docs are served at `/api/docs`.
 
 ## Environment variables
 
@@ -34,6 +39,17 @@ precedence). **Startup fails loudly if any required var is missing.**
 | `SESSION_SECRET`                | yes      | Random secret used to sign the session cookie               |
 | `ALLOWED_USER_EMAIL`            | yes      | The single account allowed to log in (the owner)            |
 | `ENV`                           | no       | `dev` (default) → cookie `Secure` off; anything else → on   |
+| `GOOGLE_CLOUD_PROJECT`          | stats    | GCP project for Firestore. Required by `/api/stats/*` only. Auto-loaded from the repo-root `.env` (same var the pipeline uses) if not already exported. |
+
+The stats endpoints read Firestore via `src/signal_store.py` using **Application
+Default Credentials** — the same ADC the pipeline relies on. Locally, run
+`gcloud auth application-default login` once if you haven't already. To avoid
+duplicating config, the store fills `GOOGLE_CLOUD_PROJECT` (and the other
+pipeline vars) from the **repo-root `.env`** when they aren't already in the
+environment; shell-exported values and `backend/.env` always take precedence.
+The store is built lazily on first stats request, so a missing project or
+missing credentials surfaces as a `503` on `/api/stats/*` rather than blocking
+startup or login.
 
 Secrets are read from env/`.env` only — never hardcoded, never logged. In
 production, fetch them from Secret Manager (mirroring `src/auth.py`'s
@@ -97,14 +113,14 @@ uvicorn app.main:app --reload --port 8000
 5. Confirm the session works:
 
    ```
-   http://localhost:8000/api/me   →  {"email": "you@example.com"}
+   http://localhost:8000/api/auth/me   →  {"email": "you@example.com"}
    ```
 
 6. Log out, then re-check `/api/me`:
 
    ```
    http://localhost:8000/api/auth/logout   →  {"status": "logged out"}
-   http://localhost:8000/api/me            →  401 {"detail": "Not authenticated."}
+   http://localhost:8000/api/auth/me            →  401 {"detail": "Not authenticated."}
    ```
 
 Signing in with a **non-allowlisted** account returns `403`

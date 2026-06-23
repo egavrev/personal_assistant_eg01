@@ -1,11 +1,27 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
+import { DashboardService } from './dashboard.service';
+import { WeeklyTrendChartComponent } from './charts/weekly-trend-chart.component';
+import { CategoryBreakdownChartComponent } from './charts/category-breakdown-chart.component';
 
 /**
- * Placeholder landing page inside the shell. Intentionally empty — the real
- * mail-processing status, stats, and controls land in the next session.
+ * Mail-processing status: headline stat cards, the last pipeline run, and two
+ * charts (weekly trend + category breakdown). Data comes from DashboardService,
+ * loaded once on construction and exposed via signals.
  */
 @Component({
   selector: 'app-dashboard',
+  imports: [DecimalPipe, WeeklyTrendChartComponent, CategoryBreakdownChartComponent],
   templateUrl: './dashboard.component.html',
 })
-export class DashboardComponent {}
+export class DashboardComponent {
+  protected readonly stats = inject(DashboardService);
+
+  constructor() {
+    void this.stats.load();
+  }
+
+  protected reload(): void {
+    void this.stats.load();
+  }
+}
