@@ -13,6 +13,7 @@ Application Default Credentials and ``GOOGLE_CLOUD_PROJECT``, exactly like
 
 from __future__ import annotations
 
+import os
 import sys
 from functools import lru_cache
 from pathlib import Path
@@ -31,6 +32,35 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 _CONFIG_PATH = _REPO_ROOT / "config" / "config.yaml"
+_ROOT_ENV_PATH = _REPO_ROOT / ".env"
+
+
+def _ensure_pipeline_env() -> None:
+    """Make the pipeline's env vars (notably GOOGLE_CLOUD_PROJECT) available.
+
+    The backend's own config loads ``backend/.env`` (the auth vars), but the GCP
+    project lives in the repo-root ``.env`` that the pipeline uses. Parse it and
+    fill *only* missing keys via ``setdefault`` — so shell-exported values and
+    ``backend/.env`` always win. Tolerates the ``declare -x``/``export`` prefixes
+    that a shell-dumped ``.env`` may carry, plus surrounding quotes.
+    """
+    if not _ROOT_ENV_PATH.exists():
+        return
+    for raw in _ROOT_ENV_PATH.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        for prefix in ("declare -x ", "export "):
+            if line.startswith(prefix):
+                line = line[len(prefix):]
+                break
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            os.environ.setdefault(key, value)
 
 
 @lru_cache(maxsize=1)
@@ -43,6 +73,7 @@ def get_store() -> "SignalStore":
     unreadable config) surfaces as a clear 503 rather than a 500 or a crash.
     """
     try:
+        _ensure_pipeline_env()
         from src.signal_store import SignalStore
 
         with open(_CONFIG_PATH) as f:

@@ -39,13 +39,17 @@ precedence). **Startup fails loudly if any required var is missing.**
 | `SESSION_SECRET`                | yes      | Random secret used to sign the session cookie               |
 | `ALLOWED_USER_EMAIL`            | yes      | The single account allowed to log in (the owner)            |
 | `ENV`                           | no       | `dev` (default) → cookie `Secure` off; anything else → on   |
-| `GOOGLE_CLOUD_PROJECT`          | stats    | GCP project for Firestore. Required by `/api/stats/*` only — auth boots without it (stats then return `503`). Same var the pipeline uses. |
+| `GOOGLE_CLOUD_PROJECT`          | stats    | GCP project for Firestore. Required by `/api/stats/*` only. Auto-loaded from the repo-root `.env` (same var the pipeline uses) if not already exported. |
 
 The stats endpoints read Firestore via `src/signal_store.py` using **Application
 Default Credentials** — the same ADC the pipeline relies on. Locally, run
-`gcloud auth application-default login` once if you haven't already. The store is
-built lazily on first stats request, so a missing project or missing credentials
-surfaces as a `503` on `/api/stats/*` rather than blocking startup or login.
+`gcloud auth application-default login` once if you haven't already. To avoid
+duplicating config, the store fills `GOOGLE_CLOUD_PROJECT` (and the other
+pipeline vars) from the **repo-root `.env`** when they aren't already in the
+environment; shell-exported values and `backend/.env` always take precedence.
+The store is built lazily on first stats request, so a missing project or
+missing credentials surfaces as a `503` on `/api/stats/*` rather than blocking
+startup or login.
 
 Secrets are read from env/`.env` only — never hardcoded, never logged. In
 production, fetch them from Secret Manager (mirroring `src/auth.py`'s
