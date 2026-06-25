@@ -394,7 +394,7 @@ class SignalStore:
         sig = snap.to_dict()
         baseline = current_classification or sig.get("classification") or {}
         sender_ref = sig.get("sender_ref")
-        subject_hint = sig.get("subject", "")
+        subject_hint = sig.get("subject", "")[:60]  # correction_log shape: subject[:60]
         prompt_version = baseline.get("prompt_version", "v1")
 
         # 1) diff -> only the correctable fields that actually changed
