@@ -6,4 +6,7 @@ httpx==0.28.1
 python-dotenv==1.0.1
 # Stats endpoints reuse the pipeline's Firestore layer (src/signal_store.py).
 google-cloud-firestore==2.27.0
+# Review accept/correct add Gmail labels via the pipeline's GmailClient
+# (src/gmail_client.py), which needs the Google API client.
+google-api-python-client==2.197.0
 PyYAML==6.0.3
