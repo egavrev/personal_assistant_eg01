@@ -144,28 +144,162 @@
         }
       </div>
 
-      <!-- Actions -->
-      <div class="flex items-center gap-2 border-t border-slate-100 px-5 py-4">
-        <button
-          type="button"
-          (click)="accept()"
-          [disabled]="review.busy()"
-          class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-50"
-        >
-          Accept
-        </button>
-        <button
-          type="button"
-          (click)="skip()"
-          [disabled]="review.busy()"
-          class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
-        >
-          Skip
-        </button>
-        @if (review.lastConfirmation()) {
-          <span class="ml-auto text-xs text-slate-500">{{ review.lastConfirmation() }}</span>
-        }
-      </div>
+      @if (!correcting()) {
+        <!-- Actions -->
+        <div class="flex items-center gap-2 border-t border-slate-100 px-5 py-4">
+          <button
+            type="button"
+            (click)="accept()"
+            [disabled]="review.busy()"
+            class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-50"
+          >
+            Accept
+          </button>
+          <button
+            type="button"
+            (click)="openCorrect()"
+            [disabled]="review.busy()"
+            class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
+          >
+            Correct
+          </button>
+          <button
+            type="button"
+            (click)="skip()"
+            [disabled]="review.busy()"
+            class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+          >
+            Skip
+          </button>
+          @if (review.lastConfirmation()) {
+            <span class="ml-auto text-xs text-slate-500">{{ review.lastConfirmation() }}</span>
+          }
+        </div>
+      } @else {
+        <!-- Correct form -->
+        <div class="space-y-4 border-t border-slate-100 px-5 py-4">
+          <!-- Category -->
+          <div>
+            <label class="text-[10px] font-medium uppercase tracking-wide text-slate-400">Category</label>
+            <select
+              [value]="formCategory()"
+              (change)="onCategoryChange($event)"
+              class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              @for (cat of review.categories(); track cat) {
+                <option [value]="cat">{{ cat }}</option>
+              }
+              <option [value]="NEW_CATEGORY">+ New category…</option>
+            </select>
+            @if (formCategory() === NEW_CATEGORY) {
+              <input
+                type="text"
+                [value]="formNewCategory()"
+                (input)="onNewCategoryInput($event)"
+                placeholder="New category name"
+                class="mt-2 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            }
+          </div>
+
+          <!-- Topics -->
+          <div>
+            <label class="text-[10px] font-medium uppercase tracking-wide text-slate-400">Topics</label>
+            <div class="mt-1 flex flex-wrap gap-1.5">
+              @for (t of topicChoices(); track t) {
+                <button
+                  type="button"
+                  (click)="toggleTopic(t)"
+                  class="rounded-full px-2.5 py-1 text-xs ring-1 transition"
+                  [class]="isTopicSelected(t)
+                    ? 'bg-indigo-600 text-white ring-indigo-600'
+                    : 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50'"
+                >
+                  {{ t }}
+                </button>
+              }
+            </div>
+            <input
+              type="text"
+              [value]="customTopic()"
+              (input)="onCustomTopicInput($event)"
+              (keydown.enter)="addCustomTopic(); $event.preventDefault()"
+              placeholder="Add a custom topic, then Enter"
+              class="mt-2 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+
+          <!-- Needs reply + sender type -->
+          <div class="flex flex-wrap gap-x-8 gap-y-4">
+            <div>
+              <p class="text-[10px] font-medium uppercase tracking-wide text-slate-400">Needs reply</p>
+              <div class="mt-1 inline-flex overflow-hidden rounded-md ring-1 ring-slate-300">
+                <button
+                  type="button"
+                  (click)="setNeedsReply(true)"
+                  class="px-3 py-1.5 text-sm transition"
+                  [class]="formNeedsReply()
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-white text-slate-600 hover:bg-slate-50'"
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  (click)="setNeedsReply(false)"
+                  class="px-3 py-1.5 text-sm transition"
+                  [class]="!formNeedsReply()
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-white text-slate-600 hover:bg-slate-50'"
+                >
+                  No
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                Sender type
+                <span class="ml-1 normal-case text-slate-400">(changing this flags an override)</span>
+              </p>
+              <div class="mt-1 inline-flex overflow-hidden rounded-md ring-1 ring-slate-300">
+                @for (st of senderTypes; track st) {
+                  <button
+                    type="button"
+                    (click)="setSenderType(st)"
+                    class="px-3 py-1.5 text-sm capitalize transition"
+                    [class]="formSenderType() === st
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-white text-slate-600 hover:bg-slate-50'"
+                  >
+                    {{ st }}
+                  </button>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- Save / Cancel -->
+          <div class="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              (click)="saveCorrection()"
+              [disabled]="review.busy()"
+              class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
+            >
+              Save correction
+            </button>
+            <button
+              type="button"
+              (click)="cancelCorrect()"
+              [disabled]="review.busy()"
+              class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      }
     </article>
   }
 </div>
