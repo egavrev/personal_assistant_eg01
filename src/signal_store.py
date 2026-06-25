@@ -165,6 +165,42 @@ class SignalStore:
                 q = q.start_after(last)
         return [(d.id, d.to_dict()) for d in q.stream()]
 
+    def get_review_queue(self, limit: int = 20,
+                         after_id: str | None = None) -> list[tuple[str, dict]]:
+        """The human review queue: ``needs_review`` signals, newest first.
+
+        Ordered by ``received_at`` descending (most recent mail first), tie-broken
+        by ``__name__`` so pagination is deterministic. The cursor is the last
+        message_id of the previous page; ``start_after`` reads the ordering fields
+        from that document's snapshot, so the caller only needs to pass an id.
+
+        Needs a composite index on signals: (status ASC, received_at DESC,
+        __name__ DESC). Firestore prints the one-click creation link on the first
+        query if it's missing. NOTE: ``received_at`` was added in Session 2; any
+        legacy needs_review signal lacking the field is excluded by the order-by
+        (acceptable — the live backlog is post-Session-2 and carries it).
+        """
+        q = (self.db.collection("signals")
+             .where(filter=FieldFilter("status", "==", "needs_review"))
+             .order_by("received_at", direction=firestore.Query.DESCENDING)
+             .order_by("__name__", direction=firestore.Query.DESCENDING)
+             .limit(limit))
+        if after_id:
+            last = self.db.collection("signals").document(after_id).get()
+            if last.exists:
+                q = q.start_after(last)
+        return [(d.id, d.to_dict()) for d in q.stream()]
+
+    def count_status(self, status: str) -> int:
+        """Count signals in one status via Firestore's count() aggregation
+        (server-side; does not read the documents). Used for the review-queue
+        ``remaining`` progress figure."""
+        agg = (self.db.collection("signals")
+               .where(filter=FieldFilter("status", "==", status))
+               .count()
+               .get())
+        return int(agg[0][0].value)
+
     def get_status_counts(self) -> dict[str, int]:
         """Count signals grouped by status via Firestore's count() aggregation
         (server-side; does not read the documents)."""
@@ -316,6 +352,25 @@ class SignalStore:
         if field == "topics":
             return sorted(old or []) != sorted(new or [])
         return old != new
+
+    def accept_classification(self, message_id: str) -> str:
+        """Human confirms the AI was right: ``needs_review`` -> ``classified``.
+
+        No correction is logged (acceptance is not a learning signal). Returns the
+        classification ``category`` so the caller can apply the matching Gmail
+        label (add-only, Safe Mode).
+        """
+        ref = self.db.collection("signals").document(message_id)
+        snap = ref.get()
+        if not snap.exists:
+            raise ValueError(f"signal {message_id} not found")
+        sig = snap.to_dict()
+        category = (sig.get("classification") or {}).get("category", "Other")
+        ref.set(
+            {"status": "classified", "updated_at": firestore.SERVER_TIMESTAMP},
+            merge=True,
+        )
+        return category
 
     def apply_correction(self, message_id: str, changes: dict,
                          current_classification: dict | None = None) -> dict:
