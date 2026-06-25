@@ -3,6 +3,7 @@ import { authGuard } from './core/auth.guard';
 import { LoginComponent } from './features/login/login.component';
 import { ShellComponent } from './features/shell/shell.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
+import { ReviewQueueComponent } from './features/review/review-queue.component';
 
 export const routes: Routes = [
   // Public: the login screen.
@@ -16,9 +17,9 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: '', component: DashboardComponent },
+      { path: 'review', component: ReviewQueueComponent },
       // ADD FUTURE PAGES HERE — one line each, paired with a navItems entry in
-      // shell.component.ts, e.g.:
-      // { path: 'review', component: ReviewQueueComponent },
+      // core/nav.ts.
     ],
   },
 

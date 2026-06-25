@@ -1,0 +1,171 @@
+<div class="mx-auto max-w-3xl px-8 py-6">
+  <header class="flex items-end justify-between border-b border-slate-200 pb-4">
+    <div>
+      <h1 class="text-lg font-semibold tracking-tight text-slate-900">Review Queue</h1>
+      <p class="mt-1 text-sm text-slate-500">
+        Correct the AI where it's wrong — every change becomes a learning signal.
+      </p>
+    </div>
+    @if (!review.isEmpty()) {
+      <div class="text-right">
+        <p class="text-sm font-medium tabular-nums text-slate-900">
+          Reviewing {{ review.position() }} of {{ review.total() }}
+        </p>
+        <p class="mt-0.5 text-xs text-slate-500">
+          Reviewed this session: <span class="tabular-nums">{{ review.reviewedCount() }}</span>
+          · Corrections logged: <span class="tabular-nums">{{ review.correctionsLogged() }}</span>
+        </p>
+      </div>
+    }
+  </header>
+
+  <!-- Loading -->
+  @if (review.loading()) {
+    <div class="mt-6 animate-pulse space-y-4">
+      <div class="h-48 rounded-lg border border-slate-200 bg-white"></div>
+      <div class="h-32 rounded-lg border border-slate-200 bg-white"></div>
+    </div>
+  } @else if (review.error()) {
+    <!-- Error -->
+    <div class="mt-6 rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+      <p class="text-sm font-medium text-red-800">Could not load the review queue.</p>
+      <button
+        type="button"
+        (click)="reload()"
+        class="mt-3 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700"
+      >
+        Retry
+      </button>
+    </div>
+  } @else if (review.isEmpty()) {
+    <!-- Empty state -->
+    <div class="mt-10 rounded-lg border border-slate-200 bg-white p-10 text-center">
+      <p class="text-base font-semibold text-slate-900">All caught up</p>
+      <p class="mt-1 text-sm text-slate-500">Nothing left to review.</p>
+      @if (review.reviewedCount() > 0) {
+        <p class="mt-2 text-xs text-slate-400">
+          Reviewed {{ review.reviewedCount() }} · logged {{ review.correctionsLogged() }} correction(s) this session.
+        </p>
+      }
+      <a
+        routerLink="/"
+        class="mt-5 inline-flex rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+      >
+        Back to dashboard
+      </a>
+    </div>
+  } @else if (review.current(); as item) {
+    <!-- The review card -->
+    <article class="mt-6 rounded-lg border border-slate-200 bg-white">
+      <!-- Sender + subject -->
+      <div class="border-b border-slate-100 px-5 py-4">
+        <div class="flex items-center gap-2">
+          <span class="truncate text-sm font-semibold text-slate-900">
+            {{ item.sender_raw }}
+          </span>
+          @if (item.classification.sender_type; as st) {
+            <span
+              class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+              [class]="st === 'person'
+                ? 'bg-emerald-50 text-emerald-700'
+                : st === 'organisation'
+                  ? 'bg-indigo-50 text-indigo-700'
+                  : 'bg-slate-100 text-slate-600'"
+            >
+              {{ st }}
+            </span>
+          }
+          @if (item.week) {
+            <span class="ml-auto shrink-0 text-xs tabular-nums text-slate-400">{{ item.week }}</span>
+          }
+        </div>
+        <p class="mt-1.5 text-sm font-medium text-slate-800">{{ item.subject || '(no subject)' }}</p>
+      </div>
+
+      <!-- Snippet + body excerpt -->
+      <div class="px-5 py-4">
+        <p class="text-sm leading-relaxed text-slate-600">{{ item.snippet }}</p>
+        @if (item.body_excerpt) {
+          <details class="group mt-3">
+            <summary
+              class="cursor-pointer select-none text-xs font-medium text-indigo-600 hover:text-indigo-800"
+            >
+              <span class="group-open:hidden">Show body excerpt</span>
+              <span class="hidden group-open:inline">Hide body excerpt</span>
+            </summary>
+            <p class="mt-2 whitespace-pre-line border-l-2 border-slate-200 pl-3 text-sm leading-relaxed text-slate-500">
+              {{ item.body_excerpt }}
+            </p>
+          </details>
+        }
+      </div>
+
+      <!-- AI classification -->
+      <div class="border-t border-slate-100 bg-slate-50 px-5 py-4">
+        <p class="text-xs font-medium uppercase tracking-wide text-slate-400">AI proposed</p>
+        <div class="mt-2 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div>
+            <p class="text-[10px] uppercase tracking-wide text-slate-400">Category</p>
+            <p class="mt-0.5 text-sm font-semibold text-slate-900">
+              {{ item.classification.category ?? '—' }}
+            </p>
+          </div>
+          <div>
+            <p class="text-[10px] uppercase tracking-wide text-slate-400">Needs reply</p>
+            <p class="mt-0.5 text-sm font-medium text-slate-900">
+              {{ item.classification.needs_reply ? 'Yes' : 'No' }}
+            </p>
+          </div>
+          <div class="min-w-[9rem]">
+            <p class="text-[10px] uppercase tracking-wide text-slate-400">
+              Confidence · {{ confidencePct(item.classification.confidence) }}%
+            </p>
+            <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+              <div
+                class="h-full rounded-full"
+                [class]="item.classification.confidence < 0.4
+                  ? 'bg-red-500'
+                  : item.classification.confidence < 0.75
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'"
+                [style.width.%]="confidencePct(item.classification.confidence)"
+              ></div>
+            </div>
+          </div>
+        </div>
+        @if (item.classification.topics.length) {
+          <div class="mt-3 flex flex-wrap gap-1.5">
+            @for (t of item.classification.topics; track t) {
+              <span class="rounded-full bg-white px-2 py-0.5 text-xs text-slate-600 ring-1 ring-slate-200">
+                {{ t }}
+              </span>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center gap-2 border-t border-slate-100 px-5 py-4">
+        <button
+          type="button"
+          (click)="accept()"
+          [disabled]="review.busy()"
+          class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-50"
+        >
+          Accept
+        </button>
+        <button
+          type="button"
+          (click)="skip()"
+          [disabled]="review.busy()"
+          class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+        >
+          Skip
+        </button>
+        @if (review.lastConfirmation()) {
+          <span class="ml-auto text-xs text-slate-500">{{ review.lastConfirmation() }}</span>
+        }
+      </div>
+    </article>
+  }
+</div>
