@@ -165,31 +165,46 @@ class SignalStore:
                 q = q.start_after(last)
         return [(d.id, d.to_dict()) for d in q.stream()]
 
+    @staticmethod
+    def _review_sort_key(row: tuple[str, dict]):
+        """Newest-first ordering key: (received_at, message_id). Missing
+        received_at falls back to the epoch so legacy signals sort to the end
+        but are never dropped."""
+        message_id, doc = row
+        return (doc.get("received_at") or _EPOCH, message_id)
+
     def get_review_queue(self, limit: int = 20,
                          after_id: str | None = None) -> list[tuple[str, dict]]:
         """The human review queue: ``needs_review`` signals, newest first.
 
-        Ordered by ``received_at`` descending (most recent mail first), tie-broken
-        by ``__name__`` so pagination is deterministic. The cursor is the last
-        message_id of the previous page; ``start_after`` reads the ordering fields
-        from that document's snapshot, so the caller only needs to pass an id.
+        Index-free by design: the automatic single-field index on ``status``
+        serves the equality filter, and we order by ``received_at`` (descending,
+        tie-broken by message_id) *in memory* — so no composite index is needed,
+        matching ``get_status_counts`` / ``category_counts`` / ``weekly_runs``.
+        Unlike a Firestore ``order_by("received_at")``, the in-memory sort still
+        includes legacy signals that predate the field (Session 2); they sort
+        last via the epoch fallback rather than being silently excluded.
 
-        Needs a composite index on signals: (status ASC, received_at DESC,
-        __name__ DESC). Firestore prints the one-click creation link on the first
-        query if it's missing. NOTE: ``received_at`` was added in Session 2; any
-        legacy needs_review signal lacking the field is excluded by the order-by
-        (acceptable — the live backlog is post-Session-2 and carries it).
+        The cursor is the previous page's last message_id. That document still
+        exists once its status has moved off ``needs_review`` (only the status
+        field changes), so we read it to recover its sort key and return the
+        items strictly after it — keeping pagination correct even as items are
+        accepted/corrected out of the queue.
         """
-        q = (self.db.collection("signals")
-             .where(filter=FieldFilter("status", "==", "needs_review"))
-             .order_by("received_at", direction=firestore.Query.DESCENDING)
-             .order_by("__name__", direction=firestore.Query.DESCENDING)
-             .limit(limit))
+        rows = [(d.id, d.to_dict())
+                for d in (self.db.collection("signals")
+                          .where(filter=FieldFilter("status", "==", "needs_review"))
+                          .stream())]
+        rows.sort(key=self._review_sort_key, reverse=True)
+
         if after_id:
-            last = self.db.collection("signals").document(after_id).get()
-            if last.exists:
-                q = q.start_after(last)
-        return [(d.id, d.to_dict()) for d in q.stream()]
+            cursor = self.db.collection("signals").document(after_id).get()
+            if cursor.exists:
+                cursor_key = ((cursor.to_dict() or {}).get("received_at") or _EPOCH,
+                              after_id)
+                rows = [r for r in rows if self._review_sort_key(r) < cursor_key]
+
+        return rows[:limit]
 
     def count_status(self, status: str) -> int:
         """Count signals in one status via Firestore's count() aggregation
