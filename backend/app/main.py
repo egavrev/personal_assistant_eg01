@@ -17,6 +17,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import router as auth_router
 from app.config import settings
+from app.routers.review import router as review_router
 from app.routers.stats import router as stats_router
 
 # Docs live under /api so they're reachable through the frontend's /api proxy.
@@ -48,3 +49,4 @@ if settings.is_dev:
 
 app.include_router(auth_router)
 app.include_router(stats_router)
+app.include_router(review_router)
