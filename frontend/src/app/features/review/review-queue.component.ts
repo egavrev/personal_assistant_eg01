@@ -1,4 +1,10 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  HostListener,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CorrectionChanges, ReviewService } from './review.service';
 
@@ -47,6 +53,44 @@ export class ReviewQueueComponent {
 
   constructor() {
     void this.review.start();
+  }
+
+  /**
+   * Keyboard-first review: a=accept, c=correct, s=skip when an item is up;
+   * Enter=save, Esc=cancel while the correct form is open. Letter shortcuts are
+   * suppressed during correction so typing into the form fields is unaffected;
+   * the topic input stops Enter from bubbling, so Enter there adds a tag instead.
+   */
+  @HostListener('document:keydown', ['$event'])
+  protected onKeydown(e: KeyboardEvent): void {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!this.review.current() || this.review.busy()) return;
+
+    if (this.correcting()) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.saveCorrection();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.cancelCorrect();
+      }
+      return;
+    }
+
+    switch (e.key.toLowerCase()) {
+      case 'a':
+        e.preventDefault();
+        this.accept();
+        break;
+      case 'c':
+        e.preventDefault();
+        this.openCorrect();
+        break;
+      case 's':
+        e.preventDefault();
+        this.skip();
+        break;
+    }
   }
 
   /** Confidence as a whole percentage for the bar/label. */
