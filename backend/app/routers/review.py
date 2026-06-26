@@ -71,6 +71,9 @@ class QueueItem(BaseModel):
     snippet: str
     body_excerpt: str = ""
     week: str | None = None
+    # True when a human sent this item back from Browse ("mark unsorted"), as
+    # opposed to it landing here because the AI was unsure. Lets the UI badge it.
+    flagged_for_review: bool = False
     classification: AIClassification
 
 
@@ -144,6 +147,7 @@ def queue(
                 snippet=sig.get("snippet", ""),
                 body_excerpt=body[:_BODY_CHARS],
                 week=sig.get("week"),
+                flagged_for_review=bool(sig.get("flagged_for_review", False)),
                 classification=AIClassification(
                     category=cls.get("category"),
                     topics=cls.get("topics") or [],

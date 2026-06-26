@@ -20,6 +20,8 @@ export interface ReviewItem {
   snippet: string;
   body_excerpt: string;
   week: string | null;
+  /** True when a human sent this back from Browse, vs. low-confidence routing. */
+  flagged_for_review: boolean;
   classification: AIClassification;
 }
 
