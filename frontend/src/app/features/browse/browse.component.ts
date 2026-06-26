@@ -23,4 +23,23 @@ export class BrowseComponent {
     const value = (e.target as HTMLSelectElement).value;
     void this.browse.select(value || null);
   }
+
+  protected markUnsorted(id: string): void {
+    void this.browse.unsort(id);
+  }
+
+  protected loadMore(): void {
+    void this.browse.loadMore();
+  }
+
+  /** Confidence as a whole percentage for the bar/label. */
+  protected confidencePct(c: number): number {
+    return Math.round(c * 100);
+  }
+
+  /** Display name from a raw sender ("GitHub <x@y>" -> "GitHub"); fall back to raw. */
+  protected senderName(raw: string): string {
+    const name = raw.split('<')[0].trim().replace(/^"|"$/g, '');
+    return name || raw;
+  }
 }

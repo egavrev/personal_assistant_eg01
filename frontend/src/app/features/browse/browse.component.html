@@ -1,23 +1,159 @@
 <div class="px-8 py-6">
-  <header class="border-b border-slate-200 pb-4">
-    <h1 class="text-lg font-semibold tracking-tight text-slate-900">Browse Mail</h1>
-    <p class="mt-1 text-sm text-slate-500">
-      Scan a category for mislabels — mark anything wrong to send it to the Review Queue.
-    </p>
+  <header class="flex items-end justify-between border-b border-slate-200 pb-4">
+    <div>
+      <h1 class="text-lg font-semibold tracking-tight text-slate-900">Browse Mail</h1>
+      <p class="mt-1 text-sm text-slate-500">
+        Scan a category for mislabels — mark anything wrong to send it to the Review Queue.
+      </p>
+    </div>
+    @if (browse.flagged() > 0) {
+      <p class="text-xs text-slate-500">
+        Flagged this session:
+        <span class="font-medium tabular-nums text-slate-900">{{ browse.flagged() }}</span>
+      </p>
+    }
   </header>
 
-  <!-- Category selector (dense list arrives in the next step) -->
-  <div class="mt-6">
-    <label class="text-[10px] font-medium uppercase tracking-wide text-slate-400">Category</label>
-    <select
-      (change)="onCategoryChange($event)"
-      [disabled]="browse.categoriesLoading()"
-      class="mt-1 block w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-    >
-      <option value="">Select a category…</option>
-      @for (c of browse.categories(); track c.category) {
-        <option [value]="c.category">{{ c.category }} ({{ c.count }})</option>
-      }
-    </select>
+  <!-- Category selector -->
+  <div class="mt-6 flex flex-wrap items-end gap-3">
+    <div>
+      <label class="text-[10px] font-medium uppercase tracking-wide text-slate-400">Category</label>
+      <select
+        (change)="onCategoryChange($event)"
+        [disabled]="browse.categoriesLoading()"
+        class="mt-1 block w-72 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+      >
+        <option value="">
+          {{ browse.categoriesLoading() ? 'Loading categories…' : 'Select a category…' }}
+        </option>
+        @for (c of browse.categories(); track c.category) {
+          <option [value]="c.category">{{ c.category }} ({{ c.count }})</option>
+        }
+      </select>
+    </div>
+    @if (browse.selected() && !browse.loading() && !browse.error()) {
+      <p class="pb-2 text-xs text-slate-500">
+        Showing <span class="tabular-nums">{{ browse.items().length }}</span>
+        of <span class="tabular-nums">{{ browse.total() }}</span> · shakiest first
+      </p>
+    }
   </div>
+
+  @if (browse.categoriesError()) {
+    <p class="mt-4 text-sm text-red-700">Could not load categories.</p>
+  }
+
+  <!-- Prompt: no category chosen yet -->
+  @if (!browse.selected()) {
+    <div class="mt-10 rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
+      <p class="text-sm font-medium text-slate-700">Pick a category to start browsing</p>
+      <p class="mt-1 text-xs text-slate-500">
+        Items are sorted lowest-confidence first — the most likely to be mislabelled.
+      </p>
+    </div>
+  } @else if (browse.loading()) {
+    <!-- Loading skeleton -->
+    <div class="mt-6 animate-pulse space-y-2">
+      @for (i of [1, 2, 3, 4, 5, 6]; track i) {
+        <div class="h-16 rounded-lg border border-slate-200 bg-white"></div>
+      }
+    </div>
+  } @else if (browse.error()) {
+    <!-- Error -->
+    <div class="mt-6 rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+      <p class="text-sm font-medium text-red-800">Could not load this category.</p>
+    </div>
+  } @else if (browse.isEmpty()) {
+    <!-- Empty -->
+    <div class="mt-10 rounded-lg border border-slate-200 bg-white p-10 text-center">
+      <p class="text-base font-semibold text-slate-900">Nothing here</p>
+      <p class="mt-1 text-sm text-slate-500">No classified mail in this category.</p>
+    </div>
+  } @else {
+    <!-- Dense scannable list -->
+    <ul class="mt-6 divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      @for (item of browse.items(); track item.id) {
+        <li class="flex items-center gap-4 px-4 py-3 transition hover:bg-slate-50">
+          <!-- Confidence indicator -->
+          <div class="w-12 shrink-0 text-right">
+            <span
+              class="text-xs font-semibold tabular-nums"
+              [class]="item.classification.confidence < 0.4
+                ? 'text-red-600'
+                : item.classification.confidence < 0.75
+                  ? 'text-amber-600'
+                  : 'text-emerald-600'"
+            >
+              {{ confidencePct(item.classification.confidence) }}%
+            </span>
+            <div class="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-200">
+              <div
+                class="h-full rounded-full"
+                [class]="item.classification.confidence < 0.4
+                  ? 'bg-red-500'
+                  : item.classification.confidence < 0.75
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'"
+                [style.width.%]="confidencePct(item.classification.confidence)"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Sender + subject + excerpt -->
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span class="truncate text-sm font-medium text-slate-900" [title]="item.sender_raw">
+                {{ senderName(item.sender_raw) }}
+              </span>
+              @if (item.status === 'corrected') {
+                <span class="shrink-0 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-indigo-700">
+                  corrected
+                </span>
+              }
+              @if (item.week) {
+                <span class="ml-auto shrink-0 text-xs tabular-nums text-slate-400">{{ item.week }}</span>
+              }
+            </div>
+            <p class="truncate text-sm text-slate-700">{{ item.subject || '(no subject)' }}</p>
+            @if (item.body_excerpt) {
+              <p class="truncate text-xs text-slate-500">{{ item.body_excerpt }}</p>
+            }
+          </div>
+
+          <!-- Action: the only thing you can do here -->
+          <button
+            type="button"
+            (click)="markUnsorted(item.id)"
+            [disabled]="browse.isBusy(item.id)"
+            class="shrink-0 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300 disabled:opacity-50"
+          >
+            {{ browse.isBusy(item.id) ? 'Marking…' : 'Mark unsorted' }}
+          </button>
+        </li>
+      }
+    </ul>
+
+    <!-- Pagination -->
+    @if (browse.hasMore()) {
+      <div class="mt-4 text-center">
+        <button
+          type="button"
+          (click)="loadMore()"
+          [disabled]="browse.loadingMore()"
+          class="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+        >
+          {{ browse.loadingMore() ? 'Loading…' : 'Load more' }}
+        </button>
+      </div>
+    }
+  }
 </div>
+
+<!-- Toast: confirmation after an item is sent to the Review Queue -->
+@if (browse.toast()) {
+  <div class="pointer-events-none fixed bottom-6 right-6 z-50">
+    <div class="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg">
+      {{ browse.toast() }}
+    </div>
+  </div>
+}
