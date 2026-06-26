@@ -235,9 +235,10 @@ class SignalStore:
         agg = self.db.collection("correction_log").count().get()
         return int(agg[0][0].value)
 
-    def category_counts(self, top: int = 10) -> list[tuple[str, int]]:
+    def category_counts(self, top: int | None = 10) -> list[tuple[str, int]]:
         """Top ``top`` categories by signal count among classified/corrected
-        signals, as ``[(name, count), ...]`` ordered descending.
+        signals, as ``[(name, count), ...]`` ordered descending. ``top=None``
+        returns every category (used to populate the Browse dropdown).
 
         Firestore has no GROUP BY and the category set is open-ended (the
         classifier may coin new categories), so a per-value count() is not an
@@ -256,6 +257,84 @@ class SignalStore:
                 if cat:
                     counter[cat] += 1
         return counter.most_common(top)
+
+    # ---------- browse (scan a category to spot mislabels) ----------
+    # The two statuses Browse shows: the AI's settled output and human-corrected
+    # items. needs_review/pending/junk never appear in Browse.
+    _BROWSE_STATUSES = ("classified", "corrected")
+
+    @staticmethod
+    def _browse_sort_key(row: tuple[str, dict]):
+        """Browse ordering key: (confidence, message_id) ascending — shakiest
+        (lowest-confidence) classifications first, since they're the most likely
+        to be mislabelled. Missing confidence sorts as 0.0 (maximally uncertain),
+        so legacy signals surface at the top rather than being dropped."""
+        message_id, doc = row
+        conf = float(((doc.get("classification") or {}).get("confidence")) or 0.0)
+        return (conf, message_id)
+
+    def get_signals_by_category(self, category: str, limit: int = 50,
+                                after_id: str | None = None,
+                                ) -> tuple[list[tuple[str, dict]], int]:
+        """Browse source: signals in ``category`` whose status is classified or
+        corrected, lowest-confidence first. Returns ``(page_rows, total)``.
+
+        Index-free, mirroring ``get_review_queue``: stream the category via the
+        automatic single-field index on ``classification.category`` (no composite
+        index), drop any status outside ``classified``/``corrected``, and sort by
+        ``(confidence, id)`` ascending *in memory*. ``total`` is the full count
+        for the category so the UI can show "showing N of total".
+
+        The cursor is the previous page's last message_id. That document still
+        exists after it's been unsorted (only its status changed, not its
+        confidence), so we read it directly to recover its sort key and return
+        the items strictly after it — keeping pagination correct even as rows are
+        marked unsorted out of the category.
+        """
+        rows = [(d.id, d.to_dict())
+                for d in (self.db.collection("signals")
+                          .where(filter=FieldFilter("classification.category", "==", category))
+                          .stream())]
+        rows = [r for r in rows
+                if (r[1] or {}).get("status") in self._BROWSE_STATUSES]
+        rows.sort(key=self._browse_sort_key)
+        total = len(rows)
+
+        if after_id:
+            cursor = self.db.collection("signals").document(after_id).get()
+            if cursor.exists:
+                cursor_key = self._browse_sort_key((after_id, cursor.to_dict() or {}))
+                rows = [r for r in rows if self._browse_sort_key(r) > cursor_key]
+
+        return rows[:limit], total
+
+    def unsort_signal(self, message_id: str) -> str:
+        """Browse "mark unsorted": flip ``classified``/``corrected`` ->
+        ``needs_review`` and set ``flagged_for_review=True`` so the Review Queue
+        can distinguish a human-flagged item from a low-confidence one.
+
+        Deliberately does NOT write a correction_log document — there's no
+        your_value yet; the correction is logged later when the item is reviewed
+        in the queue via ``apply_correction``. The Gmail label is left as-is
+        (Safe Mode; a stale label is acceptable for the POC). Returns the new
+        status. An already-``needs_review`` item is a harmless no-op (re-flags).
+        """
+        ref = self.db.collection("signals").document(message_id)
+        snap = ref.get()
+        if not snap.exists:
+            raise ValueError(f"signal {message_id} not found")
+        status = (snap.to_dict() or {}).get("status")
+        if status not in (*self._BROWSE_STATUSES, "needs_review"):
+            raise ValueError(
+                f"signal {message_id} has status {status!r}; "
+                "only classified/corrected items can be unsorted"
+            )
+        ref.set(
+            {"status": "needs_review", "flagged_for_review": True,
+             "updated_at": firestore.SERVER_TIMESTAMP},
+            merge=True,
+        )
+        return "needs_review"
 
     # ---------- runs ----------
     def weekly_runs(self) -> list[dict]:
