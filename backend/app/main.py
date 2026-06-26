@@ -17,6 +17,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import router as auth_router
 from app.config import settings
+from app.routers.pipeline import router as pipeline_router
 from app.routers.review import router as review_router
 from app.routers.signals import router as signals_router
 from app.routers.stats import router as stats_router
@@ -52,3 +53,4 @@ app.include_router(auth_router)
 app.include_router(stats_router)
 app.include_router(review_router)
 app.include_router(signals_router)
+app.include_router(pipeline_router)

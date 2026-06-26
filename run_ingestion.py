@@ -75,6 +75,39 @@ def classify_with_retry(classifier, sig, body, ctx, max_retries=4):
                 raise
 
 
+def run_one_week(gmail, firewall, store, classifier, config, state, dry_run=False) -> dict:
+    """Process exactly one cursor window end-to-end: ingest + classify, record
+    the run, and advance the cursor — the unit a bulk run repeats.
+
+    Reuses ``stage_ingest`` and ``stage_classify`` verbatim (the actual ingestion
+    and classification logic); this wrapper is only the per-week orchestration the
+    CLI ``main`` already did inline, factored out so the dashboard's bulk endpoint
+    can loop over it without reimplementing the pipeline.
+
+    Idempotent and interrupt-safe: signals are keyed by message_id (re-ingesting a
+    window writes nothing new), the run doc is written before the cursor moves,
+    and the cursor advances *only* after the week completes — so a crash mid-week
+    leaves the cursor where it was and re-running resumes the same window.
+
+    Returns the run ``stats`` enriched with ``week``/``start``/``end`` for the
+    caller. The ``stats`` written to the ``runs`` collection keep their original
+    shape (no window keys added).
+    """
+    t0 = time.time()
+    limit = config["ingestion"].get("max_fetch_per_run", 500)
+    start, end = state.get_date_window(days_to_fetch=config["ingestion"]["days_per_batch"])
+    week = week_label(start)
+    print(f"📅 {start} → {end}  ({week})")
+    stats = stage_ingest(gmail, firewall, store, week, start, end, limit, dry_run)
+    print(f"🛡️ ingest: {stats}")
+    stats.update(stage_classify(gmail, store, classifier, config, dry_run))
+    stats["duration_s"] = round(time.time() - t0, 1)
+    store.write_run(week, stats, dry_run=dry_run)
+    if not dry_run:
+        state.advance_cursor(end)
+    return {"week": week, "start": start, "end": end, **stats}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true",
@@ -95,7 +128,6 @@ def main():
     classifier = Classifier(project, clf_cfg)
 
     t0 = time.time()
-    limit = config["ingestion"].get("max_fetch_per_run", 500)
 
     # ---- 2. pipeline stages (each = a future agent) ----
     if args.classify_only:
@@ -106,22 +138,18 @@ def main():
         print("\n=== classify-only ===\n  " + "\n  ".join(f"{k}: {v}" for k, v in stats.items()))
         return   # no cursor advance, no run record — this is a re-processing pass
 
-    start, end = state.get_date_window(days_to_fetch=config["ingestion"]["days_per_batch"])
-    week = week_label(start)
-    print(f"📅 {start} → {end}  ({week})")
-    stats = stage_ingest(gmail, firewall, store, week, start, end, limit, args.dry_run)
-    print(f"🛡️ ingest: {stats}")
-    stats.update(stage_classify(gmail, store, classifier, config, args.dry_run))
+    # ---- 2b. one cursor window (record + advance live inside run_one_week) ----
+    result = run_one_week(gmail, firewall, store, classifier, config, state,
+                          dry_run=args.dry_run)
 
-    # ---- 3. record + advance ----
-    stats["duration_s"] = round(time.time() - t0, 1)
-    store.write_run(week, stats, dry_run=args.dry_run)
-    print(f"\n=== {week} ===\n  " + "\n  ".join(f"{k}: {v}" for k, v in stats.items()))
+    # ---- 3. report ----
+    week = result["week"]
+    summary = {k: v for k, v in result.items() if k != "week"}
+    print(f"\n=== {week} ===\n  " + "\n  ".join(f"{k}: {v}" for k, v in summary.items()))
     if args.dry_run:
         print("\n🟡 DRY-RUN: cursor not advanced.")
     else:
-        state.advance_cursor(end)
-        print(f"⏭️ Cursor → {end} ✅")
+        print(f"⏭️ Cursor → {result['end']} ✅")
 
 
 if __name__ == "__main__":

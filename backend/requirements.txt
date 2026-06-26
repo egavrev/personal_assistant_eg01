@@ -9,4 +9,7 @@ google-cloud-firestore==2.27.0
 # Review accept/correct add Gmail labels via the pipeline's GmailClient
 # (src/gmail_client.py), which needs the Google API client.
 google-api-python-client==2.197.0
+# Bulk run-weeks drives the real pipeline in-process; stage_classify builds the
+# pipeline's Classifier (src/classifier.py), which needs the GenAI SDK.
+google-genai==2.10.0
 PyYAML==6.0.3
