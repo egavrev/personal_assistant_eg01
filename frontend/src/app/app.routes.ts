@@ -4,6 +4,7 @@ import { LoginComponent } from './features/login/login.component';
 import { ShellComponent } from './features/shell/shell.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { ReviewQueueComponent } from './features/review/review-queue.component';
+import { BrowseComponent } from './features/browse/browse.component';
 
 export const routes: Routes = [
   // Public: the login screen.
@@ -18,6 +19,7 @@ export const routes: Routes = [
     children: [
       { path: '', component: DashboardComponent },
       { path: 'review', component: ReviewQueueComponent },
+      { path: 'signals', component: BrowseComponent },
       // ADD FUTURE PAGES HERE — one line each, paired with a navItems entry in
       // core/nav.ts.
     ],

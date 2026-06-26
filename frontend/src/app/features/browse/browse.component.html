@@ -1,0 +1,23 @@
+<div class="px-8 py-6">
+  <header class="border-b border-slate-200 pb-4">
+    <h1 class="text-lg font-semibold tracking-tight text-slate-900">Browse Mail</h1>
+    <p class="mt-1 text-sm text-slate-500">
+      Scan a category for mislabels — mark anything wrong to send it to the Review Queue.
+    </p>
+  </header>
+
+  <!-- Category selector (dense list arrives in the next step) -->
+  <div class="mt-6">
+    <label class="text-[10px] font-medium uppercase tracking-wide text-slate-400">Category</label>
+    <select
+      (change)="onCategoryChange($event)"
+      [disabled]="browse.categoriesLoading()"
+      class="mt-1 block w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+    >
+      <option value="">Select a category…</option>
+      @for (c of browse.categories(); track c.category) {
+        <option [value]="c.category">{{ c.category }} ({{ c.count }})</option>
+      }
+    </select>
+  </div>
+</div>
